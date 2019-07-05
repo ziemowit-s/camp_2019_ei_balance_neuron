@@ -4,6 +4,9 @@ tstop = 400
 steps_per_ms = 40
 dt = 0.0025
 
+P=1e-6	// AMPA Permeability in cm/s.
+NAR=1.5
+w=0.25
 
 create soma
 create dend
@@ -28,13 +31,16 @@ ni = 2
 
 exc_step = (nseg/ne)/nseg
 inh_step = (nseg/ni)/nseg
-weight = 0.5
+exc_weight = 0.5
+inh_weight = 0.5
 
-objref ncl, synl, stiml
+objref ncil, ncel, synl, stiml
 objref stim, syn, rand
 objref g[20]
 
-ncl = new List()
+ncil = new List()
+ncel = new List()
+
 stiml = new List()
 rand = new Random()
 rand.uniform(0, 1)
@@ -43,54 +49,53 @@ proc setup_exc_syn() {
     lc = 0
     for i=0, ne-1 {
         lc_temp = lc + exc_step/2
-        print(lc_temp)
         lc += exc_step
 
-        syn = new Exp2Syn(lc_temp)
-        syn.tau1 = 0.5	// Spruston JPhysiol 1995
-        syn.tau2 = 3	// Spruston JPhysiol 1995
-        syn.e = 0
+        dend syn = new AMPA(lc_temp)
+        syn.gmax      = 0.1 //0.0001 // (umho)       maximum conductance
+        syn.tau		= 5
+        syn.TRise		= 2  // Rise time
+        syn.Erev		= 0  // Reversal
+        syn.Deadtime	= 1
 
-        stim = new BurstStim2()
-        stim.number = 1
-        stim.start = 50
-        stim.interval = 10
-        stim.noise = 0
-        stim.burstint = 50	// interburst interval (ms)
-        stim.burstlen = 1000	// burst length (ms)
+        dend stim = new NetStim(lc_temp)
+        stim.interval=100   // ms (mean) time between spikes
+        stim.number=10       // (average) number of spikes
+        stim.start=50        // ms (mean) start time of first spike
+        stim.noise=0           // range 0 to 1. Fractional randomness
 
         // NetCon(source_ref, target, threshold, delay, weight)
-        ncl.append(new NetCon(stim, syn, 0, 0, weight))
+        dend ncel.append(new NetCon(stim, syn, 0, 0, 0))
     }
 }
 
-proc setup_inh_syns() {
+proc setup_inh_syn() {
+    ncil = new List()
     lc = 0
     for i=0, ni-1 {
         lc_temp = lc + inh_step/2
         lc += inh_step
-        syn = new Exp2Syn(lc_temp)
 
-        syn.tau1 = 0.5	// Spruston JPhysiol 1995
-        syn.tau2 = 3	// Spruston JPhysiol 1995
-        syn.e = 0
+        dend syn = new GABAa(lc_temp)
+        syn.TRise = 0.5
+	    syn.tau = 3
+	    syn.gmax = 0.001
 
-        stim = new BurstStim2()
-        stim.number = 1
-        stim.start = 50
-        stim.interval = 10
-        stim.noise = 0
-        stim.burstint = 50	// interburst interval (ms)
-        stim.burstlen = 1000	// burst length (ms)
+        dend stim = new NetStim(lc_temp)
+        stim.interval=100   // ms (mean) time between spikes
+        stim.number=10       // (average) number of spikes
+        stim.start=50        // ms (mean) start time of first spike
+        stim.noise=0           // range 0 to 1. Fractional randomness
 
         // NetCon(source_ref, target, threshold, delay, weight)
-        ncl.append(new NetCon(stim, syn, 0, 0, weight))
+        dend ncil.append(new NetCon(stim, syn, 0, 0, 0))
     }
 }
 
 nrnmainmenu()         // create main menu
 nrncontrolmenu()      // create control menu
 setup_exc_syn()
+setup_inh_syn()
 
 proc addgraph() { local ii  // define subroutine to add a new graph
                 // addgraph("variable", minvalue, maxvalue)
@@ -107,17 +112,6 @@ proc addgraph() { local ii  // define subroutine to add a new graph
 
 addgraph("soma.v(0.5)",-80,50)
 //addgraph("dend.v(0.0625)",-80,50)
-
-param_weight = weight
-proc update_weight() {
-	weight = param_weight
-	setup_exc_syn()
-}
-
-
-xpanel("Parameters")
-xvalue("Synaptic Weight","param_weight",1,"update_weight()",1,1)
-xpanel()
 
 
 
