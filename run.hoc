@@ -1,5 +1,10 @@
 load_file("nrngui.hoc")
 
+tstop = 400
+steps_per_ms = 40
+dt = 0.0025
+
+
 create soma
 create dend
 soma {
@@ -21,9 +26,9 @@ connect dend(0), soma(1)
 ne = 8
 ni = 2
 
-inh_step = (nseg/(ni+1))/nseg
-exc_step = (nseg/(ne+1))/nseg
-weight = 0.1
+exc_step = (nseg/ne)/nseg
+inh_step = (nseg/ni)/nseg
+weight = 0.5
 
 objref ncl, synl, stiml
 objref stim, syn, rand
@@ -34,51 +39,58 @@ stiml = new List()
 rand = new Random()
 rand.uniform(0, 1)
 
-// create excitatory syn
-lc = 0
-for i=0, ne-1 {
-    lc_temp = lc + exc_step/2
-    lc += exc_step
+proc setup_exc_syn() {
+    lc = 0
+    for i=0, ne-1 {
+        lc_temp = lc + exc_step/2
+        print(lc_temp)
+        lc += exc_step
 
-    syn = new Exp2Syn(lc_temp)
-    syn.tau1 = 0.5	// Spruston JPhysiol 1995
-    syn.tau2 = 3	// Spruston JPhysiol 1995
-    syn.e = 0
+        syn = new Exp2Syn(lc_temp)
+        syn.tau1 = 0.5	// Spruston JPhysiol 1995
+        syn.tau2 = 3	// Spruston JPhysiol 1995
+        syn.e = 0
 
-    stim = new BurstStim2()
-    stim.number = 10000
-    stim.start = 0
-    stim.interval = 10
-    stim.noise = 0
-    stim.burstint = 50	// interburst interval (ms)
-    stim.burstlen = 100	// burst length (ms)
+        stim = new BurstStim2()
+        stim.number = 1
+        stim.start = 50
+        stim.interval = 10
+        stim.noise = 0
+        stim.burstint = 50	// interburst interval (ms)
+        stim.burstlen = 1000	// burst length (ms)
 
-    // NetCon(source_ref, target, threshold, delay, weight)
-    ncl.append(new NetCon(stim, syn, 0, 0, weight))
+        // NetCon(source_ref, target, threshold, delay, weight)
+        ncl.append(new NetCon(stim, syn, 0, 0, weight))
+    }
 }
 
-// create inhibitory syn
-lc = 0
-for i=0, ni-1 {
-    lc_temp = lc + exc_step/2
-    lc += exc_step
-    syn = new Exp2Syn(lc_temp)
+proc setup_inh_syns() {
+    lc = 0
+    for i=0, ni-1 {
+        lc_temp = lc + inh_step/2
+        lc += inh_step
+        syn = new Exp2Syn(lc_temp)
 
-    syn.tau1 = 0.5	// Spruston JPhysiol 1995
-    syn.tau2 = 3	// Spruston JPhysiol 1995
-    syn.e = 0
+        syn.tau1 = 0.5	// Spruston JPhysiol 1995
+        syn.tau2 = 3	// Spruston JPhysiol 1995
+        syn.e = 0
 
-    stim = new BurstStim2()
-    stim.number = 10000
-    stim.start = 0
-    stim.interval = 10
-    stim.noise = 0
-    stim.burstint = 50	// interburst interval (ms)
-    stim.burstlen = 100	// burst length (ms)
+        stim = new BurstStim2()
+        stim.number = 1
+        stim.start = 50
+        stim.interval = 10
+        stim.noise = 0
+        stim.burstint = 50	// interburst interval (ms)
+        stim.burstlen = 1000	// burst length (ms)
 
-    // NetCon(source_ref, target, threshold, delay, weight)
-    ncl.append(new NetCon(stim, syn, 0, 0, -weight))
+        // NetCon(source_ref, target, threshold, delay, weight)
+        ncl.append(new NetCon(stim, syn, 0, 0, -weight))
+    }
 }
+
+nrnmainmenu()         // create main menu
+nrncontrolmenu()      // create control menu
+setup_exc_syn()
 
 proc addgraph() { local ii  // define subroutine to add a new graph
                 // addgraph("variable", minvalue, maxvalue)
@@ -92,6 +104,22 @@ proc addgraph() { local ii  // define subroutine to add a new graph
     g[ii].save_name("graphList[0].")
     graphList[0].append(g[ii])
 }
+
+addgraph("soma.v(0.5)",-80,50)
+addgraph("dend.v(0.1)",-80,50)
+addgraph("dend.v(0.5)",-80,50)
+addgraph("dend.v(1.0)",-80,50)
+
+param_weight = weight
+proc update_weight() {
+	weight = param_weight
+	setup_exc_syn()
+}
+
+
+xpanel("Parameters")
+xvalue("Synaptic Weight","param_weight",1,"update_weight()",1,1)
+xpanel()
 
 
 
